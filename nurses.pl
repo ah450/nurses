@@ -23,9 +23,8 @@ NurseSchedule = [NurseD | NurseScheduleRest].
 max_shifts_per_nurse(_, -1, _).
 % Nurse should start with NumNurses -1 (zero based)
 max_shifts_per_nurse(ShiftSchedule, Nurse, Max):-
-NextNurse is Nurse - 1, 
+NextNurse #= Nurse - 1, 
 nurse_schedule(ShiftSchedule, Nurse, NurseSchedule),
-%% print(NurseSchedule),
 sum(NurseSchedule, #=<, Max),
 max_shifts_per_nurse(ShiftSchedule, NextNurse, Max).
 
@@ -36,10 +35,27 @@ MorningSchedule = [MH | MT], EveningSchedule = [EH|ET], NightSchedule = [NH|NT],
 combine_schedules(MT, ET, NT, RestCombined),
 CombinedSchedule = [MH, EH, NH | RestCombined].
 
-nurse_break(MorningSchedule, EveningSchedule, NightSchedule):-
-combine_schedules(MorningSchedule, EveningSchedule, NightSchedule, CombinedSchedule),
-automaton(CombinedSchedule, [source(a), sink(a), sink(b), sink(c)], 
+nurse_day_schedule_helper(MorningShifts, EveningShifts, NightShifts, NurseID, DaySchedule):-
+nurse_schedule(MorningShifts, NurseID, MorningSchedule),
+nurse_schedule(EveningShifts, NurseID, EveningSchedule),
+nurse_schedule(NightShifts, NurseID, NightSchedule),
+combine_schedules(MorningSchedule, EveningSchedule, NightSchedule, DaySchedule).
+
+%% Num nurses is zero based
+nurse_day_schedule(MorningSchedule, EveningSchedule, NightSchedule, NumNurses, Schedules):-
+numlist(0, NumNurses, IDS),
+maplist(nurse_day_schedule_helper(MorningSchedule, EveningSchedule, NightSchedule), IDS, Schedules).
+
+working_days([], []).
+working_days([M, E, N | T], Days):-
+K in 0..1, K #>= M, K #>= E, K #>= N, working_days(T, DaysRest), Days = [K | DaysRest].
+
+% Days schedule is P * 3 length
+nurse_shift_break(NurseDaySchedule):-
+automaton(NurseDaySchedule, [source(a), sink(a), sink(b), sink(c)], 
     [arc(a, 0, a), arc(a, 1, b), arc(b, 0, c), arc(c, 0, a)]).
+
+%% working_days_limit(NurseWorkingDays):-
 
 
 % Model Notes:
@@ -53,21 +69,25 @@ schedule(MorningShifts, EveningShifts, NightShifts, NumNurses, P):-
 % Construct first dimension of the three matrices.
 length(MorningShifts, P), length(EveningShifts, P),
 length(NightShifts, P), 
-NumNurses #=< 8 * P, NumNurses #> 0,
+NumNurses #=< 8 * P, NumNurses #>= 8,
 % Minimize number of nurses.
 % Add the second dimension to our matrices
 add_dimension(MorningShifts, NumNurses),
 add_dimension(EveningShifts, NumNurses),
 add_dimension(NightShifts, NumNurses),
-NursesZeroBased #= NumNurses - 1,
-% No nurse can work more than 4 night shifts per P
-max_shifts_per_nurse(NightShifts, NursesZeroBased, 4),
-% 11 hour breaks
-maplist(nurse_break, MorningShifts, EveningShifts, NightShifts),
-% Constraints on minimum number of nurses on each shift type
 min_per_shift(MorningShifts, 3),
 min_per_shift(EveningShifts, 3),
 min_per_shift(NightShifts, 2),
+NursesZeroBased #= NumNurses - 1,
+% NurseDaySchedules is list of each nurse's schedule.
+nurse_day_schedule(MorningShifts, EveningShifts, NightShifts, NursesZeroBased, NurseDaySchedules),
+maplist(working_days, NurseDaySchedules, NurseWorking),
+% No nurse can work more than 4 night shifts per P
+max_shifts_per_nurse(NightShifts, NursesZeroBased, 4),
+% 11 hour breaks
+%% print(NumNurses), nl,
+maplist(nurse_shift_break, NurseDaySchedules),
+% Constraints on minimum number of nurses on each shift type
 % Label our schedule
 VarsNested = [MorningShifts, EveningShifts, NightShifts, NumNurses],
 flatten(VarsNested, Vars),
