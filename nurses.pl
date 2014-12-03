@@ -55,8 +55,21 @@ nurse_shift_break(NurseDaySchedule):-
 automaton(NurseDaySchedule, [source(a), sink(a), sink(b), sink(c)], 
     [arc(a, 0, a), arc(a, 1, b), arc(b, 0, c), arc(c, 0, a)]).
 
-%% working_days_limit(NurseWorkingDays):-
-
+working_days_limit(NurseWorkingDays):-
+% DFA that requires atleast 1 zero in a sequence of 6 symbols
+Nodes = [source(a), sink(a), sink(b), sink(c), sink(d), sink(e), sink(f)],
+Arcs = [arc(a, 0, a), arc(a, 1, b), arc(b, 1, c), arc(c, 1, d), 
+arc(d, 1, e), arc(e, 1, f), arc(f, 0, a), arc(e, 0, a), arc(d, 0, a), 
+arc(c, 0, a), arc(b, 0, a)], 
+automaton(NurseWorkingDays, Nodes, Arcs),
+% DFA that accepts atmost 2 zeros in a sequence of 5 symbols 
+Nodes2 = [source(a), sink(a), sink(b), sink(c), sink(d), sink(e), sink(f),
+sink(g), sink(h), sink(i), sink(j), sink(k), sink(i)],
+Arcs2 = [arc(a, 0, b), arc(a, 1, i), arc(b, 1, c), arc(b, 0, f), arc(c, 1, d), 
+arc(c, 0, g), arc(d, 1, e), arc(d, 0, h), arc(e, 1, a), arc(e, 0, a), 
+arc(f, 1, g), arc(g, 1, h), arc(h, 1, a), arc(i, 1, j), arc(i, 0, c), arc(j, 0, d),
+arc(j, 1, k), arc(k, 0, e), arc(k, 1, c), arc(c, 1, a), arc(c, 0, 1)],
+automaton(NurseWorkingDays, Nodes2, Arcs2).
 
 % Model Notes:
 % We are using a boolean representation 
@@ -79,11 +92,13 @@ min_per_shift(MorningShifts, 3),
 min_per_shift(EveningShifts, 3),
 min_per_shift(NightShifts, 2),
 NursesZeroBased #= NumNurses - 1,
+% No nurse can work more than 4 night shifts per P
+max_shifts_per_nurse(NightShifts, NursesZeroBased, 4),
 % NurseDaySchedules is list of each nurse's schedule.
 nurse_day_schedule(MorningShifts, EveningShifts, NightShifts, NursesZeroBased, NurseDaySchedules),
 maplist(working_days, NurseDaySchedules, NurseWorking),
-% No nurse can work more than 4 night shifts per P
-max_shifts_per_nurse(NightShifts, NursesZeroBased, 4),
+% Minimum of one day off per 6 days
+maplist(working_days_limit, NurseWorking),
 % 11 hour breaks
 %% print(NumNurses), nl,
 maplist(nurse_shift_break, NurseDaySchedules),
