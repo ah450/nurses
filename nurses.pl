@@ -48,7 +48,7 @@ maplist(nurse_day_schedule_helper(MorningSchedule, EveningSchedule, NightSchedul
 
 working_days([], []).
 working_days([M, E, N | T], Days):-
-K in 0..1, K #>= M, K #>= E, K #>= N, working_days(T, DaysRest), Days = [K | DaysRest].
+sum([M, E, N], #= , K), K in 0..1, working_days(T, DaysRest), Days = [K | DaysRest].
 
 % Days schedule is P * 3 length
 nurse_shift_break(NurseDaySchedule):-
@@ -69,7 +69,11 @@ Arcs2 = [arc(a, 0, b), arc(a, 1, i), arc(b, 1, c), arc(b, 0, f), arc(c, 1, d),
 arc(c, 0, g), arc(d, 1, e), arc(d, 0, h), arc(e, 1, a), arc(e, 0, a), 
 arc(f, 1, g), arc(g, 1, h), arc(h, 1, a), arc(i, 1, j), arc(i, 0, c), arc(j, 0, d),
 arc(j, 1, k), arc(k, 0, e), arc(k, 1, c), arc(c, 1, a), arc(c, 0, 1)],
-automaton(NurseWorkingDays, Nodes2, Arcs2).
+automaton(NurseWorkingDays, Nodes2, Arcs2),
+% No bride Days
+Nodes3 = [source(a), sink(a), sink(b), sink(c)],
+Arcs3 = [arc(a, 1, a), arc(a, 0, b), arc(b, 0, a), arc(b, 1, c), arc(c, 1, a)],
+automaton(NurseWorkingDays, Nodes3, Arcs3).
 
 % Model Notes:
 % We are using a boolean representation 
@@ -97,14 +101,12 @@ max_shifts_per_nurse(NightShifts, NursesZeroBased, 4),
 % NurseDaySchedules is list of each nurse's schedule.
 nurse_day_schedule(MorningShifts, EveningShifts, NightShifts, NursesZeroBased, NurseDaySchedules),
 maplist(working_days, NurseDaySchedules, NurseWorking),
-% Minimum of one day off per 6 days
+% Minimum of one day off per 6 days, max two per 5, no bridge days
 maplist(working_days_limit, NurseWorking),
-% 11 hour breaks
-%% print(NumNurses), nl,
-maplist(nurse_shift_break, NurseDaySchedules),
 % Constraints on minimum number of nurses on each shift type
 % Label our schedule
-VarsNested = [MorningShifts, EveningShifts, NightShifts, NumNurses],
+%% VarsNested = [NurseWorking,NumNurses, MorningShifts, EveningShifts, NightShifts],
+VarsNested = [NumNurses, NurseDaySchedules],
 flatten(VarsNested, Vars),
 labeling([ffc, min(NumNurses)], Vars).
 
