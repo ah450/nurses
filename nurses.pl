@@ -30,17 +30,16 @@ max_shifts_per_nurse(ShiftSchedule, NextNurse, Max).
 
 
 combine_schedules([MH|[]], [EH|[]], [NH|[]], CombinedSchedule):-
+W in 0..1,
 W #= MH + EH + NH,
-K #= min(W, 1), 
-CombinedSchedule = [K].
+CombinedSchedule = [W].
 
 combine_schedules(MorningSchedule, EveningSchedule, NightSchedule, CombinedSchedule):-
 MorningSchedule = [MH | MT], EveningSchedule = [EH|ET], NightSchedule = [NH|NT],
 combine_schedules(MT, ET, NT, RestCombined),
-%% sum([MH, EH, NH], #=, K), K in 0..1,
+W in 0..1,
 W #= MH + EH + NH,
-K #= min(W, 1), 
-CombinedSchedule = [K | RestCombined].
+CombinedSchedule = [W | RestCombined].
 
 nurse_day_schedule_helper(MorningShifts, EveningShifts, NightShifts, NurseID, DaySchedule):-
 nurse_schedule(MorningShifts, NurseID, MorningSchedule),
@@ -64,6 +63,7 @@ maplist(nurse_day_schedule_helper(MorningSchedule, EveningSchedule, NightSchedul
 
 
 % Days schedule is P * 3 length
+% 11 hour break
 nurse_shift_break(NurseDaySchedule):-
 automaton(NurseDaySchedule, [source(a), sink(a), sink(b), sink(c)], 
     [arc(a, 0, a), arc(a, 1, b), arc(b, 0, c), arc(c, 0, a)]).
@@ -83,7 +83,7 @@ arc(c, 0, g), arc(d, 1, e), arc(d, 0, h), arc(e, 1, a), arc(e, 0, a),
 arc(f, 1, g), arc(g, 1, h), arc(h, 1, a), arc(i, 1, j), arc(i, 0, c), arc(j, 0, d),
 arc(j, 1, k), arc(k, 0, e), arc(k, 1, c), arc(c, 1, a), arc(c, 0, 1)],
 automaton(NurseWorkingDays, Nodes2, Arcs2),
-% No bride Days
+% No bridge Days
 Nodes3 = [source(a), sink(a), sink(b), sink(c)],
 Arcs3 = [arc(a, 1, a), arc(a, 0, b), arc(b, 0, a), arc(b, 1, c), arc(c, 1, a)],
 automaton(NurseWorkingDays, Nodes3, Arcs3).
@@ -119,7 +119,7 @@ NumNurses #>= P/4,
 % NurseDaySchedules is list of each nurse's schedule.
 nurse_day_schedule(MorningShifts, EveningShifts, NightShifts, NursesZeroBased, NurseWorking),
 % Minimum of one day off per 6 days, max two per 5, no bridge days
-maplist(working_days_limit, NurseWorking),
+%% maplist(working_days_limit, NurseWorking),
 % Constraints on minimum number of nurses on each shift type
 % Label our schedule
 VarsNested = [MorningShifts, EveningShifts, NightShifts],
