@@ -4,7 +4,7 @@
 
 add_dimension([], _).
 add_dimension([H|T], D):-
-length(H, D), H ins 0..1, add_dimension(T, D).
+length(H, D), H ins 0..1, sum(H, #=<, D), add_dimension(T, D).
 
 
 min_per_shift([], _).
@@ -29,11 +29,18 @@ sum(NurseSchedule, #=<, Max),
 max_shifts_per_nurse(ShiftSchedule, NextNurse, Max).
 
 
-combine_schedules([MH|[]], [EH|[]], [NH|[]], [MH, EH, NH]).
+combine_schedules([MH|[]], [EH|[]], [NH|[]], CombinedSchedule):-
+W #= MH + EH + NH,
+K #= min(W, 1), 
+CombinedSchedule = [K].
+
 combine_schedules(MorningSchedule, EveningSchedule, NightSchedule, CombinedSchedule):-
 MorningSchedule = [MH | MT], EveningSchedule = [EH|ET], NightSchedule = [NH|NT],
 combine_schedules(MT, ET, NT, RestCombined),
-CombinedSchedule = [MH, EH, NH | RestCombined].
+%% sum([MH, EH, NH], #=, K), K in 0..1,
+W #= MH + EH + NH,
+K #= min(W, 1), 
+CombinedSchedule = [K | RestCombined].
 
 nurse_day_schedule_helper(MorningShifts, EveningShifts, NightShifts, NurseID, DaySchedule):-
 nurse_schedule(MorningShifts, NurseID, MorningSchedule),
@@ -46,9 +53,15 @@ nurse_day_schedule(MorningSchedule, EveningSchedule, NightSchedule, NumNurses, S
 numlist(0, NumNurses, IDS),
 maplist(nurse_day_schedule_helper(MorningSchedule, EveningSchedule, NightSchedule), IDS, Schedules).
 
-working_days([], []).
-working_days([M, E, N | T], Days):-
-sum([M, E, N], #= , K), K in 0..1, working_days(T, DaysRest), Days = [K | DaysRest].
+
+%%  Nada, Why did this signaficantly slow down our solution?
+%% When we used this to reduce triplets in the combined schedule.
+%% working_days([], []).
+%% working_days([0, 0, 0 | T], Days):-
+%% working_days(T, DaysRest), Days = [0 | DaysRest].
+%% working_days([_, _, _ | T], Days):-
+%% working_days(T, DaysRest), Days = [1 | DaysRest].
+
 
 % Days schedule is P * 3 length
 nurse_shift_break(NurseDaySchedule):-
@@ -75,6 +88,8 @@ Nodes3 = [source(a), sink(a), sink(b), sink(c)],
 Arcs3 = [arc(a, 1, a), arc(a, 0, b), arc(b, 0, a), arc(b, 1, c), arc(c, 1, a)],
 automaton(NurseWorkingDays, Nodes3, Arcs3).
 
+
+
 % Model Notes:
 % We are using a boolean representation 
 % In 3 matrices, Each PxNumNurses, where P is the scheduling period
@@ -82,11 +97,13 @@ automaton(NurseWorkingDays, Nodes3, Arcs3).
 % Structure is row major as nested lists.
 % For example MorningShifts[1][0] = 1 iff Nurse with ID 0 is on the morning
 % shift of day one.
-schedule(MorningShifts, EveningShifts, NightShifts, NumNurses, P):-
+schedule(MorningShifts, EveningShifts, NightShifts, NumNurses, P, NurseWorking):-
 % Construct first dimension of the three matrices.
 length(MorningShifts, P), length(EveningShifts, P),
 length(NightShifts, P), 
-NumNurses #=< 8 * P, NumNurses #>= 8,
+%% NumNurses #=< 8 * P, NumNurses #>= 8,
+K is 8 * P,
+between(8, K, NumNurses),
 % Minimize number of nurses.
 % Add the second dimension to our matrices
 add_dimension(MorningShifts, NumNurses),
@@ -98,17 +115,16 @@ min_per_shift(NightShifts, 2),
 NursesZeroBased #= NumNurses - 1,
 % No nurse can work more than 4 night shifts per P
 max_shifts_per_nurse(NightShifts, NursesZeroBased, 4),
+NumNurses #>= P/4,
 % NurseDaySchedules is list of each nurse's schedule.
-nurse_day_schedule(MorningShifts, EveningShifts, NightShifts, NursesZeroBased, NurseDaySchedules),
-maplist(working_days, NurseDaySchedules, NurseWorking),
+nurse_day_schedule(MorningShifts, EveningShifts, NightShifts, NursesZeroBased, NurseWorking),
 % Minimum of one day off per 6 days, max two per 5, no bridge days
 maplist(working_days_limit, NurseWorking),
 % Constraints on minimum number of nurses on each shift type
 % Label our schedule
-%% VarsNested = [NurseWorking,NumNurses, MorningShifts, EveningShifts, NightShifts],
-VarsNested = [NumNurses, NurseDaySchedules],
+VarsNested = [MorningShifts, EveningShifts, NightShifts],
 flatten(VarsNested, Vars),
-labeling([ffc, min(NumNurses)], Vars).
+labeling([ffc], Vars).
 
 
 
