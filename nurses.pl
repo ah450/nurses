@@ -64,10 +64,9 @@ maplist(nurse_day_schedule_helper(MorningSchedule, EveningSchedule, NightSchedul
 
 % Days schedule is P * 3 length
 % 11 hour break
-nurse_shift_break(NurseDaySchedule):-
-automaton(NurseDaySchedule, [source(a), sink(a), sink(b), sink(c)], 
-    [arc(a, 0, a), arc(a, 1, b), arc(b, 0, c), arc(c, 0, a)]).
-
+%% nurse_shift_break(NurseDaySchedule):-
+%% automaton(NurseDaySchedule, [source(a), sink(a), sink(b), sink(c)], 
+%%     [arc(a, 0, a), arc(a, 1, b), arc(b, 0, c), arc(c, 0, a)]).
 working_days_limit(NurseWorkingDays):-
 % DFA that requires atleast 1 zero in a sequence of 6 symbols
 Nodes = [source(a), sink(a), sink(b), sink(c), sink(d), sink(e), sink(f)],
@@ -101,11 +100,10 @@ schedule(MorningShifts, EveningShifts, NightShifts, NumNurses, P, NurseWorking):
 % Construct first dimension of the three matrices.
 length(MorningShifts, P), length(EveningShifts, P),
 length(NightShifts, P), 
-%% NumNurses #=< 8 * P, NumNurses #>= 8,
-K is 8 * P,
-between(8, K, NumNurses),
+NumNurses #=< 8 * P, NumNurses #>= 8,
 % Minimize number of nurses.
 % Add the second dimension to our matrices
+indomain(NumNurses),
 add_dimension(MorningShifts, NumNurses),
 add_dimension(EveningShifts, NumNurses),
 add_dimension(NightShifts, NumNurses),
@@ -115,16 +113,15 @@ min_per_shift(NightShifts, 2),
 NursesZeroBased #= NumNurses - 1,
 % No nurse can work more than 4 night shifts per P
 max_shifts_per_nurse(NightShifts, NursesZeroBased, 4),
-NumNurses #>= P/4,
 % NurseDaySchedules is list of each nurse's schedule.
 nurse_day_schedule(MorningShifts, EveningShifts, NightShifts, NursesZeroBased, NurseWorking),
 % Minimum of one day off per 6 days, max two per 5, no bridge days
-%% maplist(working_days_limit, NurseWorking),
+maplist(working_days_limit, NurseWorking),
 % Constraints on minimum number of nurses on each shift type
 % Label our schedule
-VarsNested = [MorningShifts, EveningShifts, NightShifts],
+VarsNested = [[NumNurses], MorningShifts, EveningShifts, NightShifts],
 flatten(VarsNested, Vars),
-labeling([ffc], Vars).
+labeling([], Vars).
 
 
 
